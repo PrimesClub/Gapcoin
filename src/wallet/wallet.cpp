@@ -3508,7 +3508,7 @@ void CWallet::SetupDescriptorScriptPubKeyMans(WalletBatch& batch, const CExtKey&
 {
     AssertLockHeld(cs_wallet);
     for (bool internal : {false, true}) {
-        for (OutputType t : {OutputType::BECH32, OutputType::BECH32M})
+        for (OutputType t : OUTPUT_TYPES)
             SetupDescriptorScriptPubKeyMan(batch, master_key, t, internal);
     }
 }

@@ -260,7 +260,7 @@ mkdir -p "$DISTSRC"
     case "$HOST" in
         *mingw*)
             cmake --build build -j "$JOBS" -t deploy ${V:+--verbose}
-            mv build/riecoin-win64-setup.exe "${OUTDIR}/${DISTNAME}-win64-setup.exe"
+            mv build/gapcoin-win64-setup.exe "${OUTDIR}/${DISTNAME}-win64-setup.exe"
             ;;
     esac
 
@@ -281,16 +281,22 @@ mkdir -p "$DISTSRC"
 
     # Perform basic security checks on installed executables.
     echo "Checking binary security on installed executables..."
-    python3 "${DISTSRC}/contrib/guix/security-check.py" "${INSTALLPATH}/bin/"* "${INSTALLPATH}/libexec/"*
+    python3 "${DISTSRC}/contrib/guix/security-check.py" "${INSTALLPATH}/bin/"*
     # Check that executables only contain allowed version symbols.
     echo "Running symbol and dynamic library checks on installed executables..."
-    python3 "${DISTSRC}/contrib/guix/symbol-check.py" "${INSTALLPATH}/bin/"* "${INSTALLPATH}/libexec/"*
+    python3 "${DISTSRC}/contrib/guix/symbol-check.py" "${INSTALLPATH}/bin/"*
 
     (
         cd installed
 
         case "$HOST" in
             *darwin*) ;;
+            *mingw*)
+                # Split binaries from their debug symbols
+                {
+                    find "${DISTNAME}/bin" -type f -executable -print0
+                } | xargs -0 -P"$JOBS" -I{} "${DISTSRC}/build/split-debug.sh" {} {} {}.dbg
+                ;;
             *)
                 # Split binaries from their debug symbols
                 {
@@ -309,9 +315,9 @@ mkdir -p "$DISTSRC"
                 ;;
         esac
 
-        # copy over the example riecoin.conf file. if contrib/devtools/gen-riecoin-conf.sh
+        # copy over the example conf file. if contrib/devtools/gen-riecoin-conf.sh
         # has not been run before buildling, this file will be a stub
-        cp "${DISTSRC}/share/examples/riecoin.conf" "${DISTNAME}/"
+        cp "${DISTSRC}/share/examples/gapcoin.conf" "${DISTNAME}/"
 
         cp -r "${DISTSRC}/share/rpcauth" "${DISTNAME}/share/"
 

@@ -5,7 +5,7 @@
 
 # Do not use generator expressions in test sources because the
 # SOURCES property is processed to gather test suite macros.
-add_executable(test_riecoin
+add_executable(test_gapcoin
   main.cpp
   addrman_tests.cpp
   allocator_tests.cpp

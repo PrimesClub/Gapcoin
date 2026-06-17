@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-present The Bitcoin Core developers
+// Copyright (c) 2014-2021 The Gapcoin developers
 // Copyright (c) 2013-present The Riecoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -121,25 +122,11 @@ void CBlockIndex::BuildSkip()
         pskip = pprev->GetAncestor(GetSkipHeight(nHeight));
 }
 
-/* We define the proof as function of the Difficulty d and l the constellation length, by
-    d^(l + 2.3)
-The power to l is inspired by the prime number theorem and the k-tuple conjecture, and the 2.3
-approximately takes in account the fact that it is harder to test longer numbers, in accordance to
-empirical data with the current miner.
-We are using floating point number as perfect precision is not critical here. */
 arith_uint256 GetBlockProof(const CBlockIndex& block)
 {
-    const Consensus::Params& consensusParams(Params().GetConsensus());
-    double difficulty(0.),
-           constellationSize(consensusParams.GetPowAcceptedPatternsAtHeight(block.nHeight)[0].size());
-    const uint32_t nBits(block.nBits);
-    const int32_t powVersion(Params().GetConsensus().GetPoWVersionAtHeight(block.nHeight));
-    if (powVersion == -1)
-        difficulty = (nBits & 0x007FFFFFU) >> 8U; // The original PoW used the Bitcoin Compact format. This formula is equivalent for any block before Fork 2.
-    else if (powVersion == 1)
-        difficulty = static_cast<double>(nBits)/256.;
-    double proof(std::pow(difficulty, constellationSize + 2.3));
-    std::string proofStr(mpz_class(proof).get_str(16));
+    // Doubles will largely suffice for the foreseeable future and possible inconsistencies across machines should not matter in practice, we do not need perfect precision for Chainwork lower bounds. Do not add Mpfr Dependency just for that.
+    const double proofd(std::exp(static_cast<double>(block.nBits)/static_cast<double>(1ULL << 48ULL)));
+    std::string proofStr(mpz_class(proofd).get_str(16));
     proofStr = std::string(64U - proofStr.length(), '0') + proofStr;
     arith_uint256 proofAU256(UintToArith256(uint256::FromHex(proofStr).value()));
     return proofAU256;

@@ -31,7 +31,7 @@ struct NodeContext;
 static constexpr int NUM_GETBLOCKSTATS_PERCENTILES = 5;
 
 /** Get the block's difficulty */
-double GetDifficulty(const CBlockIndex& blockindex, const int32_t = 0);
+double GetDifficulty(const CBlockIndex& blockindex);
 
 /** Block description to JSON */
 UniValue blockToJSON(node::BlockManager& blockman, const CBlock& block, const CBlockIndex& tip, const CBlockIndex& blockindex, TxVerbosity verbosity, uint32_t nBitsMin) LOCKS_EXCLUDED(cs_main);

@@ -327,7 +327,7 @@
                   <enum>Qt::ActionsContextMenu</enum>
                  </property>
                  <property name="text">
-                  <string notr="true">0.00 RIC</string>
+                  <string notr="true">0.00 GAP</string>
                  </property>
                  <property name="textInteractionFlags">
                   <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
@@ -378,7 +378,7 @@
                   <enum>Qt::ActionsContextMenu</enum>
                  </property>
                  <property name="text">
-                  <string notr="true">0.00 RIC</string>
+                  <string notr="true">0.00 GAP</string>
                  </property>
                  <property name="textInteractionFlags">
                   <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
@@ -461,7 +461,7 @@
                   <enum>Qt::ActionsContextMenu</enum>
                  </property>
                  <property name="text">
-                  <string notr="true">0.00 RIC</string>
+                  <string notr="true">0.00 GAP</string>
                  </property>
                  <property name="textInteractionFlags">
                   <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
@@ -828,12 +828,10 @@
                  <item>
                   <widget class="QLabel" name="labelCustomPerKilobyte">
                    <property name="toolTip">
-                    <string>Specify a custom fee per kB (1,000 bytes) of the transaction's virtual size.
-
-Note:  Since the fee is calculated on a per-byte basis, a fee rate of "100 riemanns per kvB" for a transaction size of 500 virtual bytes (half of 1 kvB) would ultimately yield a fee of only 50 riemanns.</string>
+                    <string>Specify a custom fee per kB (1,000 bytes) of the transaction's virtual size.</string>
                    </property>
                    <property name="text">
-                    <string>RIC/kvB</string>
+                    <string>GAP/kvB</string>
                    </property>
                   </widget>
                  </item>
@@ -1168,7 +1166,7 @@ Note:  Since the fee is calculated on a per-byte basis, a fee rate of "100 riema
           <cursorShape>IBeamCursor</cursorShape>
          </property>
          <property name="text">
-          <string notr="true">123.456 RIC</string>
+          <string notr="true">123.456 GAP</string>
          </property>
          <property name="textInteractionFlags">
           <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>

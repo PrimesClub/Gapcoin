@@ -872,6 +872,7 @@ void RPCConsole::clear(bool keep_prompt)
            "Type %5 for an overview of available commands.\n"
            "For more information on using this console, type %6.\n"
            "\n<u>Examples</u> (never share any output containing prv or xprv):\n"
+           " - Mine Coins: minetoaddress address threads\n"
            " - Import a Descriptor (or more): importdescriptors '[{\"desc\": \"tr(...)\", \"timestamp\": 0}]'\n"
            " - Export/Backup Wallet Descriptors: listdescriptors true\n"
            " - Some Basic Commands: getblockhash n, getblock hash [bool], getblockheader hash [bool], getblockchaininfo, getrawtransaction hash [bool]\n")

@@ -1,5 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-present The Bitcoin Core developers
+// Copyright (c) 2014-2021 The Gapcoin developers
 // Copyright (c) 2013-present The Riecoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -37,7 +38,7 @@
 using namespace util::hex_literals;
 
 /** Build the genesis block. Note that the output of its generation transaction cannot be spent since it did not originally exist in the database. */
-static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint64_t nTime, arith_uint256 nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
+static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint64_t nTime, uint32_t nNonce, uint64_t nBits, int32_t nVersion, uint16_t nShift, std::vector<uint8_t> nAdd, const CAmount& genesisReward)
 {
     CMutableTransaction txNew;
     txNew.version = 1;
@@ -55,6 +56,8 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
     genesis.vtx.push_back(MakeTransactionRef(std::move(txNew)));
     genesis.hashPrevBlock.SetNull();
     genesis.hashMerkleRoot = BlockMerkleRoot(genesis);
+    genesis.nShift   = nShift;
+    genesis.nAdd     = nAdd;
     return genesis;
 }
 
@@ -72,12 +75,9 @@ class CMainParams : public CChainParams {
 public:
     CMainParams(const MainNetOptions& opts) {
         m_chain_type = ChainType::MAIN;
-        consensus.nSubsidyHalvingInterval = 840000;
-        consensus.fork1Height = 157248;
-        consensus.fork2Height = 1482768;
-        consensus.MinBIP9WarningHeight = 1520064 + 4032; // Taproot activation height + miner confirmation window
-        consensus.powAcceptedPatterns = {{0, 2, 4, 2, 4, 6, 2}, {0, 2, 6, 4, 2, 4, 2}}; // Prime septuplets, starting from fork2Height
-        consensus.nBitsMin = 600*256; // Difficulty 600, starting from fork2Height
+        consensus.nSubsidyHalvingInterval = 420000;
+        consensus.MinBIP9WarningHeight = 2478151;
+        consensus.nBitsMin = 16ULL << 48ULL;
         consensus.nPowTargetSpacing = 150; // 2.5 min
         consensus.fPowNoRetargeting = false;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
@@ -89,25 +89,23 @@ public:
 
         ApplyDeploymentOptions(opts.dep_opts);
 
-        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000014282dba4b3ba8151be1f96200000"}; // 2577747
+        consensus.nMinimumChainWork = uint256{"00000000000000000000000000000000000000000000000000213622b9ddf093"}; // 2478511
 
         /** The message start string is designed to be unlikely to occur in normal data. The characters are rarely used upper ASCII, not valid as UTF-8, and produce a large 32-bit integer with any alignment. */
-        pchMessageStart[0] = 0xfc;
-        pchMessageStart[1] = 0xbc;
-        pchMessageStart[2] = 0xb2;
-        pchMessageStart[3] = 0xdb;
-        nDefaultPort = 28333;
+        pchMessageStart[0] = 0xd1;
+        pchMessageStart[1] = 0xdf;
+        pchMessageStart[2] = 0xe6;
+        pchMessageStart[3] = 0xf9;
+        nDefaultPort = 31469;
         nPruneAfterHeight = 100000;
         m_assumed_blockchain_size = 3;
         m_assumed_chain_state_size = 1;
 
-        const CScript genesisOutputScript(CScript() << "04ff3c7ec6f2ed535b6d0d373aaff271c3e6a173cd2830fd224512dea3398d7b90a64173d9f112ec9fa8488eb56232f29f388f0aaf619bdd7ad786e731034eadf8"_hex << OP_CHECKSIG);
-        genesis = CreateGenesisBlock("The Times 10/Feb/2014 Thousands of bankers sacked since crisis", genesisOutputScript, 1392079741, UintToArith256(uint256{"0000000000000000000000000000000000000000000000000000000000000000"}), 33632256, 1, 0);
+        const CScript genesisOutputScript(CScript() << "044588d54931b7de2f9faaa5a3c1fde654114ae51273754e1f3f9720127f8977af6bfaa1f33e22e80e4b83f5269921501b411d254929faf1b10d2174ded28ac59d"_hex << OP_CHECKSIG);
+        genesis = CreateGenesisBlock("The Times 15/Oct/2014 US data sends global stocks into tail-spin", genesisOutputScript, 1413914400, 13370, consensus.nBitsMin, 1, 20, {233, 156, 15}, 0);
         consensus.hashGenesisBlock = genesis.GetHash();
-        consensus.hashGenesisBlockForPoW = genesis.GetHashForPoW();
-        assert(consensus.hashGenesisBlock == uint256{"e1ea18d0676ef9899fbc78ef428d1d26a2416d0f0441d46668d33bcb41275740"});
-        assert(consensus.hashGenesisBlockForPoW == uint256{"26d0466d5a0eab0ebf171eacb98146b26143d143463514f26b28d3cded81c1bb"});
-        assert(genesis.hashMerkleRoot == uint256{"d59afe19bb9e6126be90b2c8c18a8bee08c3c50ad3b3cca2b91c09683aa48118"});
+        assert(consensus.hashGenesisBlock == uint256{"e798f3ae4f57adcf25740fe43100d95ec4fd5d43a1568bc89e2b25df89ff6cb0"});
+        assert(genesis.hashMerkleRoot == uint256{"261010cfad2ae26a355e56c2551ea2cc05549df11db7f40db7c2b9e3b40e1194"});
 
         // Note that of those which support the service bits prefix, most only support a subset of
         // possible options.
@@ -119,7 +117,7 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x88, 0xB2, 0x1E};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x88, 0xAD, 0xE4};
 
-        bech32_hrp = "ric"; // https://github.com/satoshilabs/slips/blob/master/slip-0173.md
+        bech32_hrp = "gap";
 
         vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_main), std::end(chainparams_seed_main));
 
@@ -129,34 +127,31 @@ public:
         checkpointData = mainCheckpointData;
 
         m_assumeutxo_data = {
-            { // dumptxoutset Utxo.dat rollback '{"rollback": 2576000}'
+            { // dumptxoutset Utxo.dat rollback '{"rollback": 2476000}'
                 .height = mainCheckpointData.assumedValidBlockHeight,
-                .hash_serialized = AssumeutxoHash{uint256{"eb74cf9dab210bde758a690e800928ed82e1f9b7ee8f7fcb39075dcaea6efac2"}},
-                .m_chain_tx_count = 4851279,
+                .hash_serialized = AssumeutxoHash{uint256{"79e06f27b58ba5449b7ecad54ffee3d000ed82b3ae070b17bda4cb0b7139adf7"}},
+                .m_chain_tx_count = 2689488,
                 .blockhash = mainCheckpointData.assumedValidBlockHash
             }
         };
 
         chainTxData = ChainTxData{
-            // getchaintxstats 65536 51fef00481bb625046e212ff964d1f451fc9254ce91a021e0355dc9344e795b4
-            .nTime    = 1780745632,
-            .tx_count = 4853038,
-            .dTxRate  = 0.006851715276590424,
+            // getchaintxstats 65536 ba868d8969736d149a34590c48446b2af5f425e2fc7665196fda7455a1dad1b2
+            .nTime    = 1781172148,
+            .tx_count = 2692000,
+            .dTxRate  = 0.006719591242756351,
         };
     }
 };
 
-/** Testnet: public test network which is reset from time to time (lastly with 2404). */
+/** Testnet: public test network which is reset from time to time. */
 class CTestNetParams : public CChainParams {
 public:
     CTestNetParams(const TestNetOptions& opts) {
         m_chain_type = ChainType::TESTNET;
-        consensus.nSubsidyHalvingInterval = 840000;
-        consensus.fork1Height = 2147483647; // No SuperBlocks
-        consensus.fork2Height = 0; // Start Chain already with Fork 2 Rules
+        consensus.nSubsidyHalvingInterval = 420000;
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powAcceptedPatterns = {{0, 4, 2, 4, 2}, {0, 2, 4, 2, 4}}; // Prime quintuplets for TestNet
-        consensus.nBitsMin = 512*256; // Difficulty 512
+        consensus.nBitsMin = 1ULL << 48ULL;
         consensus.nPowTargetSpacing = 300; // 5 min, 2x less blocks to download for TestNet
         consensus.fPowNoRetargeting = false;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
@@ -168,23 +163,21 @@ public:
 
         ApplyDeploymentOptions(opts.dep_opts);
 
-        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000ff60de7fe4f1dfd102000"}; // 238989
+        consensus.nMinimumChainWork = uint256{"0000000000000000000000000000000000000000000000000000000000000000"}; // 
 
-        pchMessageStart[0] = 0x0e;
-        pchMessageStart[1] = 0x09;
-        pchMessageStart[2] = 0x11;
-        pchMessageStart[3] = 0x05;
-        nDefaultPort = 38333;
+        pchMessageStart[0] = 0x0b;
+        pchMessageStart[1] = 0x11;
+        pchMessageStart[2] = 0x09;
+        pchMessageStart[3] = 0x07;
+        nDefaultPort = 19661;
         nPruneAfterHeight = 1000;
         m_assumed_blockchain_size = 1;
         m_assumed_chain_state_size = 1;
 
-        genesis = CreateGenesisBlock("Happy Birthday, Stella!", CScript(OP_RETURN), 1707684554, UintToArith256(uint256{"00000000000000000000000000000000000000000000002990adb3a701960002"}), consensus.nBitsMin, 536870912, 50*COIN);
+        const CScript genesisOutputScript(CScript() << "044588d54931b7de2f9faaa5a3c1fde654114ae51273754e1f3f9720127f8977af6bfaa1f33e22e80e4b83f5269921501b411d254929faf1b10d2174ded28ac59d"_hex << OP_CHECKSIG);
+        genesis = CreateGenesisBlock("The Times 15/Oct/2014 US data sends global stocks into tail-spin", genesisOutputScript, 1413914400, 1, consensus.nBitsMin, 1, 20, {25, 1}, 0);
         consensus.hashGenesisBlock = genesis.GetHash();
-        consensus.hashGenesisBlockForPoW = genesis.GetHashForPoW();
-        assert(consensus.hashGenesisBlock == uint256{"753b93f5e3938f69d2b33c8c7572b019b12fa877e78581eebd65d349ca8645da"});
-        assert(consensus.hashGenesisBlockForPoW == uint256{"d38d558bf81079c5c1662f6645dfa9856bcda0f54c93c5ca3788a59c7cfcc734"});
-        assert(genesis.hashMerkleRoot == uint256{"495297a63256ff66e6bb810adc1660eee7a98eb55dbfeae8e25b1365b8bacca6"});
+        assert(consensus.hashGenesisBlock == uint256{"cee5f695d016eda5137a820588ea1891eb107bb94daccff819849507e5bb17cc"});
 
         vFixedSeeds.clear();
         vSeeds.clear();
@@ -194,7 +187,7 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
 
-        bech32_hrp = "tric"; // https://github.com/satoshilabs/slips/blob/master/slip-0173.md
+        bech32_hrp = "tgap";
 
         vFixedSeeds = std::vector<uint8_t>(std::begin(chainparams_seed_test), std::end(chainparams_seed_test));
 
@@ -204,19 +197,12 @@ public:
         checkpointData = testCheckpointData;
 
         m_assumeutxo_data = {
-            { // dumptxoutset UtxoTestnet.dat rollback '{"rollback": 238000}'
-                .height = testCheckpointData.assumedValidBlockHeight,
-                .hash_serialized = AssumeutxoHash{uint256{"b18fdf83bec4df2121183baae0572daa6693e8bfa34be3430cdfc388f0105ba9"}},
-                .m_chain_tx_count = 238014,
-                .blockhash = testCheckpointData.assumedValidBlockHash
-            }
         };
 
         chainTxData = ChainTxData{
-            // getchaintxstats 16384 83eef761b56c0c3ea4bb1edce79c6a80d882e1bddcbc55d066b81110e86afeff
-            .nTime    = 1780745962,
-            .tx_count = 239003,
-            .dTxRate  = 0.002970954495291334,
+            .nTime = 0,
+            .tx_count = 0,
+            .dTxRate = 0.001
         };
     }
 };
@@ -229,11 +215,8 @@ public:
     {
         m_chain_type = ChainType::REGTEST;
         consensus.nSubsidyHalvingInterval = 150;
-        consensus.fork1Height = 2147483647; // No SuperBlocks
-        consensus.fork2Height = 0; // Start Chain already with Fork 2 Rules
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powAcceptedPatterns = {{0}}; // Just prime numbers for RegTest
-        consensus.nBitsMin = 288*256; // 288
+        consensus.nBitsMin = 16ULL << 48ULL;
         consensus.nPowTargetSpacing = 150; // 2.5 min
         consensus.fPowNoRetargeting = true; // No Difficulty Adjustment
 
@@ -257,12 +240,10 @@ public:
 
         ApplyDeploymentOptions(opts.dep_opts);
 
-        genesis = CreateGenesisBlock("Happy Birthday, Stella!", CScript(OP_RETURN), 1707684554, UintToArith256(uint256{"00000000000000000000000000000000000000000000000000000000001a0002"}), consensus.nBitsMin, 536870912, 50*COIN);
+        const CScript genesisOutputScript(CScript() << "044588d54931b7de2f9faaa5a3c1fde654114ae51273754e1f3f9720127f8977af6bfaa1f33e22e80e4b83f5269921501b411d254929faf1b10d2174ded28ac59d"_hex << OP_CHECKSIG);
+        genesis = CreateGenesisBlock("The Times 15/Oct/2014 US data sends global stocks into tail-spin", genesisOutputScript, 1413914400, 13370, consensus.nBitsMin, 1, 20, {233, 156, 15}, 0);
         consensus.hashGenesisBlock = genesis.GetHash();
-        consensus.hashGenesisBlockForPoW = genesis.GetHashForPoW();
-        assert(consensus.hashGenesisBlock == uint256{"08982e71e300f2c7f5b967df5e9b40788942abd4bc62edaeabd27d351f953b68"});
-        assert(consensus.hashGenesisBlockForPoW == uint256{"e450cfcfbf053cbba2c70088cbe95a5bb4133665126028dd916a553dbf49d94a"});
-        assert(genesis.hashMerkleRoot == uint256{"495297a63256ff66e6bb810adc1660eee7a98eb55dbfeae8e25b1365b8bacca6"});
+        assert(consensus.hashGenesisBlock == uint256{"e798f3ae4f57adcf25740fe43100d95ec4fd5d43a1568bc89e2b25df89ff6cb0"});
 
         vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
         vSeeds.clear();
@@ -308,7 +289,7 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x35, 0x87, 0xCF};
         base58Prefixes[EXT_SECRET_KEY] = {0x04, 0x35, 0x83, 0x94};
 
-        bech32_hrp = "rric"; // https://github.com/satoshilabs/slips/blob/master/slip-0173.md
+        bech32_hrp = "rric"; // Use same as Riecoin to avoid having to adjust Tests again.
     }
 };
 

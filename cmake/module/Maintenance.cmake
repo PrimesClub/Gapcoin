@@ -20,7 +20,7 @@ function(setup_split_debug_script)
 endfunction()
 
 function(add_windows_deploy_target)
-  if(MINGW AND TARGET riecoin AND TARGET riecoin-qt AND TARGET riecoind AND TARGET riecoin-cli AND TARGET riecoin-tx AND TARGET riecoin-wallet AND TARGET test_riecoin)
+  if(MINGW AND TARGET gapcoin AND TARGET gapcoin-qt AND TARGET gapcoind AND TARGET gapcoin-cli)
     find_program(MAKENSIS_EXECUTABLE makensis)
     if(NOT MAKENSIS_EXECUTABLE)
       add_custom_target(deploy
@@ -34,19 +34,16 @@ function(add_windows_deploy_target)
     include(GenerateSetupNsi)
     generate_setup_nsi()
     add_custom_command(
-      OUTPUT ${PROJECT_BINARY_DIR}/riecoin-win64-setup.exe
+      OUTPUT ${PROJECT_BINARY_DIR}/gapcoin-win64-setup.exe
       COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/release
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:riecoin> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:riecoin>
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:riecoin-qt> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:riecoin-qt>
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:riecoind> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:riecoind>
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:riecoin-cli> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:riecoin-cli>
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:riecoin-tx> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:riecoin-tx>
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:riecoin-wallet> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:riecoin-wallet>
-      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:test_riecoin> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:test_riecoin>
-      COMMAND ${MAKENSIS_EXECUTABLE} -V2 ${PROJECT_BINARY_DIR}/riecoin-win64-setup.nsi
+      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:gapcoin> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:gapcoin>
+      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:gapcoin-qt> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:gapcoin-qt>
+      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:gapcoind> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:gapcoind>
+      COMMAND ${CMAKE_STRIP} $<TARGET_FILE:gapcoin-cli> -o ${PROJECT_BINARY_DIR}/release/$<TARGET_FILE_NAME:gapcoin-cli>
+      COMMAND ${MAKENSIS_EXECUTABLE} -V2 ${PROJECT_BINARY_DIR}/gapcoin-win64-setup.nsi
       VERBATIM
     )
-    add_custom_target(deploy DEPENDS ${PROJECT_BINARY_DIR}/riecoin-win64-setup.exe)
+    add_custom_target(deploy DEPENDS ${PROJECT_BINARY_DIR}/gapcoin-win64-setup.exe)
   endif()
 endfunction()
 

@@ -69,14 +69,9 @@ struct Params {
     int nSubsidyHalvingInterval;
     /** Don't warn about unknown BIP 9 activations below this height. This prevents us from warning about the CSV and segwit activations. */
     int MinBIP9WarningHeight;
-    int fork1Height;
-    int fork2Height;
     std::array<BIP9Deployment,MAX_VERSION_BITS_DEPLOYMENTS> vDeployments;
     /** Proof of work parameters */
-    int32_t GetPoWVersionAtHeight(int32_t height) const {return height < fork2Height ? -1 : 1;}
-    std::vector<std::vector<int32_t>> powAcceptedPatterns;
-    std::vector<std::vector<int32_t>> GetPowAcceptedPatternsAtHeight(int height) const {return height >= fork2Height ? powAcceptedPatterns : std::vector<std::vector<int32_t>>{{0, 4, 2, 4, 2, 4}};} // MainNet Only: Prime Sextuplets prior Fork 2
-    uint32_t nBitsMin;
+    uint64_t nBitsMin;
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     std::chrono::seconds PowTargetSpacing() const {return std::chrono::seconds{nPowTargetSpacing};}

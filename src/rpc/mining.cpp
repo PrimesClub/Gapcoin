@@ -54,6 +54,7 @@
 #include <univalue.h>
 #include <util/chaintype.h>
 #include <util/check.h>
+#include <util/moneystr.h>
 #include <util/signalinterrupt.h>
 #include <util/strencodings.h>
 #include <util/string.h>
@@ -78,6 +79,11 @@
 #include <utility>
 #include <vector>
 
+#include <PoWCore/PoW.h>
+#include <PoWCore/PoWProcessor.h>
+#include <PoWCore/PoWUtils.h>
+#include <PoWCore/Sieve.h>
+
 using interfaces::BlockRef;
 using interfaces::BlockTemplate;
 using interfaces::Mining;
@@ -95,17 +101,26 @@ using util::ToString;
  * The metric may be improved at any time.
  */
 static UniValue GetNetworkMiningPower(int lookup, int height, const CChain& active_chain) {
-    if (lookup <= 0)
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid nblocks. Must be greater than 0.");
-    if (height < -1 || height > active_chain.Height())
+    if (lookup < -1 || lookup == 0) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid nblocks. Must be a positive number or -1.");
+    }
+
+    if (height < -1 || height > active_chain.Height()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Block does not exist at specified height");
+    }
+
     const CBlockIndex* pb = active_chain.Tip();
 
-    if (height >= 0)
+    if (height >= 0) {
         pb = active_chain[height];
+    }
 
     if (pb == nullptr || !pb->nHeight)
         return 0;
+
+    // If lookup is -1, then use blocks since last difficulty change.
+    if (lookup == -1)
+        lookup = pb->nHeight % 2016 + 1;
 
     // If lookup is larger than chain, then set it to chain length.
     if (lookup > pb->nHeight)
@@ -114,13 +129,8 @@ static UniValue GetNetworkMiningPower(int lookup, int height, const CChain& acti
     const CBlockIndex* pb0 = pb;
     int64_t minTime = pb0->GetBlockTime();
     int64_t maxTime = minTime;
-    const Consensus::Params& consensusParams(Params().GetConsensus());
-    double miningPower(0.), expectedDuration(consensusParams.nPowTargetSpacing*lookup);
-    for (int i = 0; i < lookup; i++) {
-        double difficulty(GetDifficulty(*pb0)),
-               referenceDifficulty(static_cast<double>((consensusParams.nBitsMin)/256.)),
-               constellationSize(consensusParams.GetPowAcceptedPatternsAtHeight(pb0->nHeight)[0].size());
-        miningPower += std::pow(difficulty/referenceDifficulty, constellationSize + 2.3);
+    /* exclude the genesis block */
+    for (int i = 0; i < lookup && pb0->pprev->pprev; i++) {
         pb0 = pb0->pprev;
         int64_t time = pb0->GetBlockTime();
         minTime = std::min(time, minTime);
@@ -131,7 +141,10 @@ static UniValue GetNetworkMiningPower(int lookup, int height, const CChain& acti
     if (minTime == maxTime)
         return 0;
 
-    return (expectedDuration/(maxTime - minTime))*(miningPower/lookup);
+    arith_uint256 workDiff = pb->nChainWork - pb0->nChainWork;
+    int64_t timeDiff = maxTime - minTime;
+
+    return workDiff.getdouble() / timeDiff;
 }
 
 static RPCMethod getnetworkminingpower()
@@ -139,14 +152,13 @@ static RPCMethod getnetworkminingpower()
     return RPCMethod{
         "getnetworkminingpower",
         "Returns the estimated network mining power based on the last n blocks.\n"
-        "The mining power is normalized such that 1 corresponds to finding a minimum difficulty block every 150 s.\n"
                 "Pass in [height] to estimate the network speed at the time when a certain block was found.\n",
                 {
                     {"nblocks", RPCArg::Type::NUM, RPCArg::Default{120}, "The number of blocks."},
                     {"height", RPCArg::Type::NUM, RPCArg::Default{-1}, "To estimate at the time of the given height."},
                 },
                 RPCResult{
-                    RPCResult::Type::NUM, "", "Hashes per second estimated"},
+                    RPCResult::Type::NUM, "", "Primes per second estimated"},
                 RPCExamples{
                     HelpExampleCli("getnetworkminingpower", "")
             + HelpExampleRpc("getnetworkminingpower", "")
@@ -165,13 +177,15 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock&& block, uint64_t&
     block_out.reset();
     block.hashMerkleRoot = BlockMerkleRoot(block);
 
-    block.nNonce = UintToArith256(uint256{"0000000000000000000000000000000000000000000000000000000000000002"}); // PoW Version 1 (0002), Primorial Number 1 (Primorial = 2), Parameters at 0. Note that due to the Primorial then being 1 here, +1 is added to the Primorial Offsets for the Target Offsets.
-    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(block.GetHashForPoW(), block.nBits, ArithToUint256(block.nNonce), chainman.GetConsensus()) && !chainman.m_interrupt) {
-        block.nNonce += 131072; // Brute Force Prime Number Search (increment by 2 until we find one)
+    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint64_t>::max() && !CheckProofOfWork(block.GetHash(), block.nShift, block.nAdd, block.nBits)) {
+        ++block.nNonce;
         --max_tries;
     }
     if (max_tries == 0 || chainman.m_interrupt) {
         return false;
+    }
+    if (block.nNonce == std::numeric_limits<uint64_t>::max()) {
+        return true;
     }
 
     block_out = std::make_shared<const CBlock>(std::move(block));
@@ -283,6 +297,189 @@ static RPCMethod generate()
     return RPCMethod{"generate", "has been replaced by the -generate cli option. Refer to -help for more information.", {}, {}, RPCExamples{""}, [](const RPCMethod& self, const JSONRPCRequest& request) -> UniValue {
         throw JSONRPCError(RPC_METHOD_NOT_FOUND, self.ToString());
     }};
+}
+
+double dPrimesPerSec = 0.0;
+double dTestsPerSec = 0.0;
+double d15GapsPerHour = 0.0;
+uint64_t nMiningSieveSize = 33554432;
+uint64_t nMiningPrimes = 900000;
+uint16_t nMiningShift = 25;
+static std::vector<double> dThreadPrimesPerSec;
+static std::vector<double> dThreadTestsPerSec;
+
+unsigned int nTransactionsUpdated = 0;
+uint256 hashBestChain = ArithToUint256(0);
+uint64_t nMiningTimeStart = 0;
+uint64_t nPrimesPerSec = 0;
+int64_t nHPSTimerStart = 0;
+
+bool CheckWork(const CBlock& block, ChainstateManager& chainman)
+{
+   uint256 hash = block.GetHash();
+   std::vector<uint8_t> vHash(hash.begin(), hash.end());
+   PoW pow(vHash, block.nShift, block.nAdd, block.nBits);
+   uint64_t nDifficulty = pow.difficulty();
+   if (nDifficulty < block.nBits)
+      return false;
+   // Found a solution
+   mpz_class target, start, end;
+   pow.get_gap(start, end);
+   mpz_import(target.get_mpz_t(), block.nAdd.size(), -1, sizeof(uint8_t), -1, 0, block.nAdd.data());
+   LogInfo("GapcoinMiner found Block worth %s GAP!\n", FormatMoney(block.vtx[0]->vout[0].nValue));
+   // Process this block the same as if we had received it from another node
+   auto block_out(std::make_shared<const CBlock>(std::move(block)));
+   if (!chainman.ProcessNewBlock(block_out, /*force_processing=*/true, nullptr)) {
+     throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
+   }
+   return true;
+}
+
+class BlockProcessor : public PoWProcessor {
+   CBlock *pblock;
+   ChainstateManager& chainman;
+public:
+   BlockProcessor(CBlock *pblock0, ChainstateManager& chainman0) :
+      PoWProcessor(), pblock(pblock0), chainman(chainman0) {}
+
+   bool process(PoW *pow) override {
+      pow->get_adder(&pblock->nAdd);
+      bool ret = CheckWork(*pblock, chainman);
+      return !ret;
+   }
+};
+
+static bool minerRunning(false);
+void Miner(int nThread, int numThreads, const CScript &output_script, const JSONRPCRequest& request)
+{
+    NodeContext& node = EnsureAnyNodeContext(request.context);
+    ChainstateManager& chainman = EnsureChainman(node);
+    const CTxMemPool& mempool = EnsureMemPool(node);
+    LogInfo("Miner %s started\n", nThread);
+    Sieve sieve(NULL, nMiningPrimes, nMiningSieveSize);
+    try {
+        while (minerRunning) {
+            // Create new block
+            unsigned int nTransactionsUpdatedLast(mempool.GetTransactionsUpdated());
+            CBlockIndex* pindexPrev(chainman.ActiveChain().Tip());
+            if (!pindexPrev) break;
+            std::unique_ptr<node::CBlockTemplate> pblocktemplate(BlockAssembler(chainman.ActiveChainstate(), &mempool, {.coinbase_output_script = output_script}).CreateNewBlock());
+            CBlock *pblock = &pblocktemplate->block;
+
+            // Search
+            BlockProcessor processor(pblock, chainman);
+            sieve.set_pprocessor(&processor);
+            int64_t nStart = GetTime();
+
+            // Provide unique hashes for each thread
+            pblock->nNonce = nThread;
+            while (minerRunning) {
+                // header hash has to be greater than 2^255 - 1
+                arith_uint256 hashTarget = UintToArith256(uint256("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"));
+                while (UintToArith256(pblock->GetHash()) <= hashTarget)
+                    pblock->nNonce += numThreads;
+                 // Re-get the hash for the block but as uint256
+                 pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+                 uint256 hash = pblock->GetHash();
+                 pblock->nShift         = nMiningShift;
+                 std::vector<uint8_t> vHash(hash.begin(), hash.end());
+                 PoW pow(vHash, pblock->nShift, pblock->nAdd, pblock->nBits);
+                 sieve.run_sieve(&pow, NULL);
+                 static Mutex cs;
+                 {
+                     LOCK(cs);
+                     dThreadPrimesPerSec[nThread] = sieve.primes_per_sec();
+                     dThreadTestsPerSec[nThread] = sieve.tests_per_second();
+                     dPrimesPerSec = 0.;
+                     dTestsPerSec  = 0.;
+                     for (uint32_t i(0); i < dThreadPrimesPerSec.size(); i++) {
+                         dPrimesPerSec += dThreadPrimesPerSec[i];
+                         dTestsPerSec  += dThreadTestsPerSec[i];
+                     }
+                     // nHPSTimerStart = GetTimeMillis();
+                     static int64_t nLogTime = 0;
+                     if (GetTime() - nLogTime > 60) {
+                         nLogTime = GetTime();
+                         LogInfo("Gapcoin miner %s primemeter %6.0f primes/s.\n", nThread, dPrimesPerSec);
+                     }
+                 }
+                 if (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 60)
+                     break;
+                 if (pindexPrev != chainman.ActiveChain().Tip())
+                     break;
+                 // Update nTime every few seconds
+                 if (UpdateTime(pblock, chainman.GetConsensus(), pindexPrev) < 0)
+                     break; // Recreate the block if the clock has run backwards, so that we can use the correct time.
+            }
+        }
+        static Mutex cs;
+        LOCK(cs);
+        dPrimesPerSec = 0.0;
+    }
+    catch (const std::runtime_error &e) {
+        LogInfo("Miner %s runtime error: %s.\n", nThread, e.what());
+        return;
+    }
+}
+
+static RPCMethod minetoaddress()
+{
+    return RPCMethod{"minetoaddress",
+        "Mine to a specified address.",
+         {
+             {"address", RPCArg::Type::STR, RPCArg::Optional::NO, "The address to send the newly generated coins to."},
+             {"threads", RPCArg::Type::NUM, RPCArg::Optional::NO, "How many threads to use for mining. 0 to stop mining."},
+             {"shift", RPCArg::Type::NUM, RPCArg::Default{25}, "The shift."},
+             {"sieve", RPCArg::Type::NUM, RPCArg::Default{33554432}, "The sieve size."},
+             {"primes", RPCArg::Type::NUM, RPCArg::Default{900000}, "The primes in sieve."},
+         },
+         RPCResult{
+             RPCResult::Type::NUM, "threads", "Number of threads that were started."},
+         RPCExamples{
+            "\nGenerate blocks to myaddress\n"
+            + HelpExampleCli("minetoaddress", "\"myaddress\" 16")
+            + "If you are using the " CLIENT_NAME " wallet, you can get a new address to send the newly generated coins to with:\n"
+            + HelpExampleCli("getnewaddress", "")
+                },
+        [](const RPCMethod& self, const JSONRPCRequest& request) -> UniValue
+{
+    const uint32_t num_threads{request.params[1].isNull() ? 1U : request.params[1].getInt<uint32_t>()};
+    static std::vector<std::thread> minerThreads;
+    minerRunning = false;
+    if (minerThreads.size() != 0) {
+        for (auto &minerThread : minerThreads)
+            minerThread.join();
+        minerThreads = std::vector<std::thread>();
+    }
+
+    if (num_threads == 0)
+       return num_threads;
+
+    CTxDestination destination = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(destination)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
+    }
+    CScript coinbase_output_script = GetScriptForDestination(destination);
+
+    nMiningShift = request.params[2].isNull() ? 25 : request.params[2].getInt<int>();
+    nMiningSieveSize = request.params[3].isNull() ? 33554432 : request.params[3].getInt<int>();
+    nMiningPrimes = request.params[4].isNull() ? 900000 : request.params[4].getInt<int>();
+
+    dThreadPrimesPerSec.clear();
+    dThreadTestsPerSec.clear();
+
+    // Reset metrics
+    // nMiningTimeStart = GetTimeMicros();
+    nPrimesPerSec = 0;
+    minerRunning = true;
+    for (uint64_t i(0); i < num_threads; i++) {
+        dThreadPrimesPerSec.push_back(0.);
+        dThreadTestsPerSec.push_back(0.);
+        minerThreads.push_back(std::thread(&Miner, i, num_threads, coinbase_output_script, request));
+    }
+    return num_threads;
+},
+    };
 }
 
 static RPCMethod generatetoaddress()
@@ -437,6 +634,7 @@ static RPCMethod generateblock()
     };
 }
 
+static PoWUtils *powUtils(new PoWUtils);
 static RPCMethod getmininginfo()
 {
     return RPCMethod{
@@ -452,6 +650,8 @@ static RPCMethod getmininginfo()
                         {RPCResult::Type::STR_HEX, "bits", "The current nBits, integer representation of the block difficulty target"},
                         {RPCResult::Type::NUM, "difficulty", "The current difficulty"},
                         {RPCResult::Type::NUM, "networkminingpower", "The network mining power"},
+                        {RPCResult::Type::NUM, "miningpower", "The miner's mining power"},
+                        {RPCResult::Type::NUM, "profitability", "The miner's estimated gross profitability (GAP/day)"},
                         {RPCResult::Type::NUM, "pooledtx", "The size of the mempool"},
                         {RPCResult::Type::STR_AMOUNT, "blockmintxfee", "Minimum feerate of packages selected for block inclusion in " + CURRENCY_UNIT + "/kvB"},
                         {RPCResult::Type::STR, "chain", "current network name (" LIST_CHAIN_NAMES ")"},
@@ -486,6 +686,8 @@ static RPCMethod getmininginfo()
     obj.pushKV("bits", strprintf("%08x", tip.nBits));
     obj.pushKV("difficulty", GetDifficulty(tip));
     obj.pushKV("networkminingpower", getnetworkminingpower().HandleRequest(request));
+    obj.pushKV("miningpower", dPrimesPerSec);
+    obj.pushKV("profitability", powUtils->gaps_per_day(dPrimesPerSec, tip.nBits));
     obj.pushKV("pooledtx", mempool.size());
     const auto mining_options{node::FlattenMiningOptions(node.mining_args)};
     obj.pushKV("blockmintxfee", ValueFromAmount(CHECK_NONFATAL(mining_options.block_min_fee_rate)->GetFeePerK()));
@@ -694,14 +896,6 @@ static RPCMethod getblocktemplate()
                 {RPCResult::Type::NUM_TIME, "curtime", "current timestamp in " + UNIX_EPOCH_TIME},
                 {RPCResult::Type::STR, "bits", "compressed target of next block"},
                 {RPCResult::Type::NUM, "height", "The height of the next block"},
-                {RPCResult::Type::NUM, "powversion", "The PoW version"},
-                {RPCResult::Type::ARR, "patterns", "The accepted constellation patterns",
-                {
-                    {RPCResult::Type::ARR, "", "pattern",
-                    {
-                        {RPCResult::Type::NUM, "", "offset"},
-                    }},
-                }},
                 {RPCResult::Type::STR_HEX, "default_witness_commitment", /*optional=*/true, "a valid witness commitment for the unmodified block template"},
             }},
         },
@@ -990,17 +1184,6 @@ static RPCMethod getblocktemplate()
     result.pushKV("curtime", block.GetBlockTime());
     result.pushKV("bits", strprintf("%08x", block.nBits));
     result.pushKV("height", pindexPrev->nHeight + 1);
-    result.pushKV("powversion", consensusParams.GetPoWVersionAtHeight(pindexPrev->nHeight + 1));
-    UniValue patternsUV(UniValue::VARR);
-    std::vector<std::vector<int32_t>> patterns(consensusParams.GetPowAcceptedPatternsAtHeight(pindexPrev->nHeight + 1));
-    for (const auto &pattern : patterns)
-    {
-        UniValue patternUV(UniValue::VARR);
-        for (const auto &offset : pattern)
-            patternUV.push_back(offset);
-        patternsUV.push_back(patternUV);
-    }
-    result.pushKV("patterns", patternsUV);
 
     if (auto coinbase{block_template->getCoinbaseTx()}; coinbase.required_outputs.size() > 0) {
         CHECK_NONFATAL(coinbase.required_outputs.size() == 1); // Only one output is currently expected
@@ -1130,6 +1313,7 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"mining", &prioritisetransaction},
         {"mining", &getprioritisedtransactions},
         {"mining", &getblocktemplate},
+        {"mining", &minetoaddress},
         {"mining", &submitblock},
         {"mining", &submitheader},
 

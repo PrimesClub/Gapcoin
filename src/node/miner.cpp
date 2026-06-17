@@ -16,6 +16,7 @@
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <interfaces/types.h>
+#include <key_io.h>
 #include <node/blockstorage.h>
 #include <node/kernel_notifications.h>
 #include <node/mining_args.h>
@@ -160,7 +161,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = m_options.coinbase_output_script;
     // Block subsidy + fees
-    const CAmount block_reward{nFees/2 + GetBlockSubsidy(nHeight, chainparams.GetConsensus())};
+    const CAmount block_reward{nFees/2 + GetBlockSubsidy(nHeight, GetNextWorkRequired(pindexPrev, chainparams.GetConsensus()), chainparams.GetConsensus())};
     coinbaseTx.vout[0].nValue = block_reward;
     coinbase_tx.block_reward_remaining = block_reward;
 
@@ -207,7 +208,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     pblock->hashPrevBlock = pindexPrev->GetBlockHash();
     UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
     pblock->nBits = GetNextWorkRequired(pindexPrev, chainparams.GetConsensus());
-    pblock->nNonce = UintToArith256(uint256{"0000000000000000000000000000000000000000000000000000000000000002"});
+    pblock->nNonce = 0;
 
     if (m_options.test_block_validity) {
         if (BlockValidationState state{TestBlockValidity(m_chainstate, *pblock, /*check_pow=*/false, /*check_merkle_root=*/false)}; !state.IsValid()) {

@@ -132,6 +132,10 @@ add_library(riecoin_common STATIC EXCLUDE_FROM_ALL
   outputtype.cpp
   policy/feerate.cpp
   policy/policy.cpp
+  PoWCore/PoWUtils.cpp
+  PoWCore/PoW.cpp
+  PoWCore/PoWProcessor.h
+  PoWCore/Sieve.cpp
   pow.cpp
   protocol.cpp
   psbt.cpp
@@ -164,20 +168,19 @@ if(ENABLE_WALLET)
   add_subdirectory(wallet)
 
   if(BUILD_WALLET_TOOL)
-    add_executable(riecoin-wallet
+    add_executable(gapcoin-wallet
       riecoin-wallet.cpp
       init/riecoin-wallet.cpp
       wallet/wallettool.cpp
     )
-    add_windows_resources(riecoin-wallet riecoin-wallet-res.rc)
-    add_windows_application_manifest(riecoin-wallet)
-    target_link_libraries(riecoin-wallet
+    add_windows_resources(gapcoin-wallet gapcoin-wallet-res.rc)
+    target_link_libraries(gapcoin-wallet
       core_interface
       riecoin_wallet
       riecoin_common
       riecoin_util
     )
-    install_binary_component(riecoin-wallet HAS_MANPAGE)
+    install_binary_component(gapcoin-wallet HAS_MANPAGE)
   endif()
 endif()
 
@@ -306,40 +309,40 @@ endif()
 
 # Riecoin wrapper executable that can call other executables.
 if(BUILD_BITCOIN_BIN)
-  add_executable(riecoin riecoin.cpp)
-  add_windows_resources(riecoin riecoin-res.rc)
-  add_windows_application_manifest(riecoin)
-  target_link_libraries(riecoin core_interface riecoin_common riecoin_util)
-  install_binary_component(riecoin HAS_MANPAGE)
+  add_executable(gapcoin riecoin.cpp)
+  add_windows_resources(gapcoin riecoin-res.rc)
+  add_windows_application_manifest(gapcoin)
+  target_link_libraries(gapcoin core_interface riecoin_common riecoin_util)
+  install_binary_component(gapcoin HAS_MANPAGE)
 endif()
 
 # Riecoin Core riecoind.
 if(BUILD_DAEMON)
-  add_executable(riecoind
+  add_executable(gapcoind
     riecoind.cpp
     init/riecoind.cpp
   )
-  add_windows_resources(riecoind riecoind-res.rc)
-  add_windows_application_manifest(riecoind)
-  target_link_libraries(riecoind
+  add_windows_resources(gapcoind riecoind-res.rc)
+  add_windows_application_manifest(gapcoind)
+  target_link_libraries(gapcoind
     core_interface
     riecoin_node
     $<TARGET_NAME_IF_EXISTS:riecoin_wallet>
   )
-  install_binary_component(riecoind HAS_MANPAGE)
+  install_binary_component(gapcoind HAS_MANPAGE)
 endif()
 if(ENABLE_IPC AND BUILD_DAEMON)
-  add_executable(riecoin-node
+  add_executable(gapcoin-node
     riecoind.cpp
     init/riecoin-node.cpp
   )
-  target_link_libraries(riecoin-node
+  target_link_libraries(gapcoin-node
     core_interface
     riecoin_node
     riecoin_ipc
     $<TARGET_NAME_IF_EXISTS:riecoin_wallet>
   )
-  install_binary_component(riecoin-node INTERNAL)
+  install_binary_component(gapcoin-node INTERNAL)
 endif()
 
 
@@ -356,31 +359,30 @@ target_link_libraries(riecoin_cli
 
 # Riecoin Core RPC client
 if(BUILD_CLI)
-  add_executable(riecoin-cli riecoin-cli.cpp init/basic.cpp)
-  add_windows_resources(riecoin-cli riecoin-cli-res.rc)
-  add_windows_application_manifest(riecoin-cli)
-  target_link_libraries(riecoin-cli
+  add_executable(gapcoin-cli riecoin-cli.cpp init/basic.cpp)
+  add_windows_resources(gapcoin-cli riecoin-cli-res.rc)
+  add_windows_application_manifest(gapcoin-cli)
+  target_link_libraries(gapcoin-cli
     core_interface
     riecoin_cli
     riecoin_common
     riecoin_ipc
     riecoin_util
   )
-  install_binary_component(riecoin-cli HAS_MANPAGE)
+  install_binary_component(gapcoin-cli HAS_MANPAGE)
 endif()
 
 
 if(BUILD_TX)
-  add_executable(riecoin-tx riecoin-tx.cpp)
-  add_windows_resources(riecoin-tx riecoin-tx-res.rc)
-  add_windows_application_manifest(riecoin-tx)
-  target_link_libraries(riecoin-tx
+  add_executable(gapcoin-tx riecoin-tx.cpp)
+  add_windows_resources(gapcoin-tx riecoin-tx-res.rc)
+  target_link_libraries(gapcoin-tx
     core_interface
     riecoin_common
     riecoin_util
     univalue
   )
-  install_binary_component(riecoin-tx HAS_MANPAGE)
+  install_binary_component(gapcoin-tx HAS_MANPAGE)
 endif()
 
 
@@ -395,16 +397,16 @@ if(BUILD_KERNEL_LIB)
     add_subdirectory(test/kernel)
   endif()
   if(BUILD_UTIL_CHAINSTATE)
-    add_executable(riecoin-chainstate
+    add_executable(gapcoin-chainstate
       riecoin-chainstate.cpp
     )
-    add_windows_application_manifest(riecoin-chainstate)
-    target_link_libraries(riecoin-chainstate
+    add_windows_application_manifest(gapcoin-chainstate)
+    target_link_libraries(gapcoin-chainstate
       PRIVATE
         core_interface
         riecoinkernel
     )
-    install_binary_component(riecoin-chainstate INTERNAL)
+    install_binary_component(gapcoin-chainstate INTERNAL)
   endif()
 endif()
 

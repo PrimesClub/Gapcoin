@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-present The Bitcoin Core developers
+// Copyright (c) 2014-2021 The Gapcoin developers
 // Copyright (c) 2013-present The Riecoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -1837,28 +1838,20 @@ PackageMempoolAcceptResult ProcessNewPackage(Chainstate& active_chainstate, CTxM
     return result;
 }
 
-CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
+CAmount GetBlockSubsidy(int nHeight, uint64_t nBits, const Consensus::Params& consensusParams)
 {
     int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
     // Force block reward to zero when right shift is undefined.
     if (halvings >= 64)
         return 0;
 
-    CAmount nSubsidy = 50 * COIN;
-    // Subsidy is cut in half every 840,000 blocks which will occur approximately every 4 years.
+    int64_t nSubsidy(((nBits >> 27)*COIN) >> 21);
+    // Subsidy is cut in half every 420,000 blocks which will occur approximately every 2 years.
     nSubsidy >>= halvings;
 
-    // Validate old Blocks under obsolete Subsidy rules
-    // Since Blocks with Coinbase Values less than the normal Subsidy are valid and unclaimed rewards cannot be retrieved, the following do not longer need special code:
-    // - The Fair Launch (no reward for the first 576 Blocks and linear increasing for next 576)
-    // - The Blocks surrounding a SuperBlock (136/150 the normal Subsidy to compensate)
-    // We still need to handle SuperBlocks.
-    if (nHeight > consensusParams.fork1Height && nHeight < consensusParams.fork2Height) {
-        if (isSuperblock(nHeight, consensusParams))
-            nSubsidy *= 28; // It was actually 2084/75x = ~27.8x, but we can consider an small upper bound and save a division...
-    }
-
     return nSubsidy;
+    // Obsolete Subsidy Rules: since Blocks with Coinbase Values less than the normal Subsidy are valid and unclaimed rewards cannot be retrieved, we do not longer need special code for:
+    // - The Fair Launch (quadratically increasing for the first 1152 Blocks)
 }
 
 CoinsViews::CoinsViews(DBParams db_params, CoinsViewOptions options)
@@ -2416,9 +2409,8 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         {
             CAmount txfee = 0;
             TxValidationState tx_state;
-            // Latest Block with Transactions Fees lower than the absolute minimum: 1564856.
-            // Note that its Timestamp was before TestNet and RegTest Genesis, allowing a simpler check.
-            const bool enforceMinFee(pindex->nTime > 1629298530 && m_chainman.GetParams().GetChainType() != ChainType::REGTEST); // A few Functional Tests need to be adjusted.
+            // Enforce Minimum Fee like Riecoin after giving plenty of time for the Gapcoin Nodes to Upgrade to 2606+.
+            const bool enforceMinFee((pindex->nTime > 1813000000 && m_chainman.GetParams().GetChainType() != ChainType::REGTEST) || m_chainman.GetParams().GetChainType() == ChainType::TESTNET); // A few Functional Tests need to be adjusted.
             if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee, enforceMinFee)) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
@@ -2494,9 +2486,9 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<SecondsDouble>(m_chainman.time_connect),
              Ticks<MillisecondsDouble>(m_chainman.time_connect) / m_chainman.num_blocks_total);
 
-    CAmount blockReward = GetBlockSubsidy(pindex->nHeight, params.GetConsensus()) + nFees/2; // At least half of Fees must be Burnt.
-    if (params.GetConsensus().fork2Height == 1482768 && pindex->nHeight < 2142898) // Only effective about 1 month after 24.04 Release in MainNet.
-        blockReward = nFees + GetBlockSubsidy(pindex->nHeight, params.GetConsensus());
+    CAmount blockReward = GetBlockSubsidy(pindex->nHeight, pindex->nBits, params.GetConsensus()) + nFees/2; // At least half of Fees must be Burnt.
+    if (m_chainman.GetParams().GetChainType() == ChainType::MAIN && pindex->nHeight < 2688000) // Give plenty of time for the Gapcoin Nodes to Upgrade to 2606+ before enforcing.
+        blockReward = nFees + GetBlockSubsidy(pindex->nHeight, pindex->nBits, params.GetConsensus());
     if (block.vtx[0]->GetValueOut() > blockReward && state.IsValid()) {
         state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-amount",
                       strprintf("coinbase pays too much (actual=%d vs limit=%d)", block.vtx[0]->GetValueOut(), blockReward));
@@ -3711,8 +3703,8 @@ void ChainstateManager::ReceivedBlockTransactions(const CBlock& block, CBlockInd
 static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
 {
     // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetHashForPoW(), block.nBits, ArithToUint256(block.nNonce), consensusParams))
-        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "short-constellation", "proof of work failed");
+    if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nShift, block.nAdd, block.nBits))
+        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "short-gap", "proof of work failed");
 
     return true;
 }
@@ -3954,8 +3946,6 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     const Consensus::Params& consensusParams = chainman.GetConsensus();
     if (block.nBits != GetNextWorkRequired(pindexPrev, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect proof of work");
-    if (block.GetPoWVersion() != consensusParams.GetPoWVersionAtHeight(nHeight))
-        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-pow-version", "incorrect proof of work version");
 
     // Check against checkpoints, don't accept any forks from the main chain prior to hardcoded checkpoint.
     const CBlockIndex* pcheckpoint = blockman.GetCheckpoint(chainman.GetParams().Checkpoints().assumedValidBlockHash);
@@ -3976,14 +3966,14 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
         return state.Invalid(BlockValidationResult::BLOCK_TIME_FUTURE, "time-too-new", "block timestamp too far in the future");
     }
 
-    if (nHeight >= consensusParams.fork2Height) { // Stricter Timestamp Check starting from Fork 2 (note that the MAX_FUTURE_BLOCK_TIME above was also reduced to 15 s).
+    if (nHeight >= 2688000 || chainman.GetParams().GetChainType() != ChainType::MAIN) { // Enforce Stricter Timestamp Check like Riecoin after giving plenty of time for the Gapcoin Nodes to Upgrade to 2606+.
         if (block.GetBlockTime() < pindexPrev->GetBlockTime() - 15)
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "time-too-old", "block's timestamp is too early");
     }
 
     // Reject blocks with outdated version
     if (block.nVersion < 2 ||
-       (block.nVersion < 4 && (nHeight >= 1096704 || chainman.GetParams().GetChainType() != ChainType::MAIN))) { // Though we do enforce DERSIG/CLTV retroactively in 24.04+, not all Blocks had Version >= 4 before SegWit Activation in Riecoin.
+       (block.nVersion < 4 && (nHeight >= 2688000 || chainman.GetParams().GetChainType() != ChainType::MAIN))) { // Give plenty of time for the Gapcoin Nodes to Upgrade to 2606+ before rejecting these Blocks.
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, strprintf("bad-version(0x%08x)", block.nVersion),
                                  strprintf("rejected nVersion=0x%08x block", block.nVersion));
     }

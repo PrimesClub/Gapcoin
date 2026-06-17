@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-present The Bitcoin Core developers
+// Copyright (c) 2014-2020 The Gapcoin developers
 // Copyright (c) 2013-present The Riecoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -11,6 +12,7 @@
 #include <consensus/params.h>
 #include <flatfile.h>
 #include <kernel/cs_main.h>
+#include <PoWCore/PoW.h>
 #include <primitives/block.h>
 #include <serialize.h>
 #include <sync.h>
@@ -139,12 +141,17 @@ public:
     //! @sa ActivateSnapshot
     uint32_t nStatus GUARDED_BY(::cs_main){0};
 
+    // pow utils
+    PoWUtils *utils{new PoWUtils()};
+
     //! block header
     int32_t nVersion{0};
     uint256 hashMerkleRoot{};
-    int64_t nTime{0};
-    uint32_t nBits{0};
-    arith_uint256 nNonce{0};
+    uint32_t nTime{0};
+    uint64_t nBits{0};
+    uint32_t nNonce{0};
+    uint16_t nShift{0};
+    std::vector<uint8_t> nAdd{0};
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     //! Initialized to SEQ_ID_INIT_FROM_DISK{1} when loading blocks from disk, except for blocks
@@ -152,14 +159,16 @@ public:
     int32_t nSequenceId{SEQ_ID_INIT_FROM_DISK};
 
     //! (memory only) Maximum nTime in the chain up to and including this block.
-    int64_t nTimeMax{0};
+    uint32_t nTimeMax{0};
 
     explicit CBlockIndex(const CBlockHeader& block)
         : nVersion{block.nVersion},
           hashMerkleRoot{block.hashMerkleRoot},
           nTime{block.nTime},
           nBits{block.nBits},
-          nNonce{block.nNonce}
+          nNonce{block.nNonce},
+          nShift{block.nShift},
+          nAdd{block.nAdd}
     {
     }
 
@@ -195,6 +204,8 @@ public:
         block.nTime = nTime;
         block.nBits = nBits;
         block.nNonce = nNonce;
+        block.nShift = nShift;
+        block.nAdd = nAdd;
         return block;
     }
 
@@ -352,6 +363,8 @@ public:
         READWRITE(obj.nTime);
         READWRITE(obj.nBits);
         READWRITE(obj.nNonce);
+        READWRITE(obj.nShift);
+        READWRITE(obj.nAdd);
     }
 
     uint256 ConstructBlockHash() const

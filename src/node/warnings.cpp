@@ -23,7 +23,7 @@ Warnings::Warnings()
     if (!CLIENT_VERSION_IS_RELEASE) {
         m_warnings.insert(
             {Warning::PRE_RELEASE_TEST_BUILD,
-             _("This is a development version, be sure to regularly follow the latest Riecoin news to be aware of possible bugs and updates!")});
+             _("This is a development version, be sure to regularly follow the latest news on Gapcoin.club to be aware of possible bugs and updates!")});
     }
 }
 bool Warnings::Set(warning_type id, bilingual_str message)

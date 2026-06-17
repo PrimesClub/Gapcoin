@@ -23,7 +23,11 @@ static const std::string OUTPUT_TYPE_STRING_UNKNOWN = "unknown";
 
 std::optional<OutputType> ParseOutputType(std::string_view type)
 {
-    if (type == OUTPUT_TYPE_STRING_BECH32)
+    if (type == OUTPUT_TYPE_STRING_LEGACY)
+        return OutputType::LEGACY;
+    else if (type == OUTPUT_TYPE_STRING_P2SH_SEGWIT)
+        return OutputType::P2SH_SEGWIT;
+    else if (type == OUTPUT_TYPE_STRING_BECH32)
         return OutputType::BECH32;
     else if (type == OUTPUT_TYPE_STRING_BECH32M)
         return OutputType::BECH32M;

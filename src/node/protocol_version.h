@@ -17,6 +17,6 @@ static const int PROTOCOL_VERSION = CLIENT_VERSION;
 static const int INIT_PROTO_VERSION = 209;
 
 //! disconnect from peers older than this proto version
-static const int MIN_PEER_PROTO_VERSION = 70016;
+static const int MIN_PEER_PROTO_VERSION = 70002;
 
 #endif // BITCOIN_NODE_PROTOCOL_VERSION_H

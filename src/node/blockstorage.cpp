@@ -142,11 +142,13 @@ bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, s
                 pindexNew->nTime          = diskindex.nTime;
                 pindexNew->nBits          = diskindex.nBits;
                 pindexNew->nNonce         = diskindex.nNonce;
+                pindexNew->nShift         = diskindex.nShift;
+                pindexNew->nAdd           = diskindex.nAdd;
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
 
                 // This makes the start very long and disabling this check should not have any practical drawback. It has been so since at least 0.10.2 (2014). So, assume that the disk's PoW data is valid.
-                /*if (!CheckProofOfWork(pindexNew->GetBlockHeader().GetHashForPoW(), pindexNew->nBits, ArithToUint256(pindexNew->nNonce), consensusParams)) {
+                /*if (!CheckProofOfWork(pindexNew->GetBlockHeader().GetHash(), pindexNew->nShift, pindexNew->nAdd, pindexNew->nBits)) {
                     LogError("%s: CheckProofOfWork failed: %s\n", __func__, pindexNew->ToString());
                     return false;
                 }*/
@@ -1066,11 +1068,11 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
         return false;
     }
 
-    const auto block_hash{block.GetHash()}, block_hash_pow{block.GetHashForPoW()};
+    const auto block_hash{block.GetHash()};
 
     // Check the header
     // This makes some operations like wallet rescanning unreasonably long, and disabling this check should not have any practical drawback. So, assume that the disk's PoW data is valid.
-    /*if (!CheckProofOfWork(block_hash_pow, block.nBits, ArithToUint256(block.nNonce), GetConsensus())) {
+    /*if (!CheckProofOfWork(block_hash, block.nShift, block.nAdd, block.nBits)) {
         LogError("Errors in block header at %s while reading block", pos.ToString());
         return false;
     }*/

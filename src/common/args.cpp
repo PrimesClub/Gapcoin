@@ -35,7 +35,7 @@
 #include <utility>
 #include <variant>
 
-const char * const BITCOIN_CONF_FILENAME = "riecoin.conf";
+const char * const BITCOIN_CONF_FILENAME = "gapcoin.conf";
 const char * const BITCOIN_SETTINGS_FILENAME = "settings.json";
 
 ArgsManager gArgs;
@@ -855,7 +855,7 @@ fs::path GetDefaultDataDir()
     // Unix-like: ~/.riecoin
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_LOCAL_APPDATA) / "Riecoin";
+    return GetSpecialFolderPath(CSIDL_LOCAL_APPDATA) / "Gapcoin2606";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -865,10 +865,10 @@ fs::path GetDefaultDataDir()
         pathRet = fs::path(pszHome);
 #ifdef __APPLE__
     // macOS
-    return pathRet / "Library/Application Support/Riecoin";
+    return pathRet / "Library/Application Support/Gapcoin2606";
 #else
     // Unix-like
-    return pathRet / ".riecoin";
+    return pathRet / ".gapcoin2606";
 #endif
 #endif
 }

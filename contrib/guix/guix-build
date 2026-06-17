@@ -156,7 +156,7 @@ done
 if (( total_required_KiB > avail_KiB )); then
     total_required_GiB=$((total_required_KiB / 1048576))
     avail_GiB=$((avail_KiB / 1048576))
-    echo "Performing a Riecoin Core Guix build for the selected HOSTS requires ${total_required_GiB} GiB, however, only ${avail_GiB} GiB is available. Please free up some disk space before performing the build."
+    echo "Performing a Guix build for the selected HOSTS requires ${total_required_GiB} GiB, however, only ${avail_GiB} GiB is available. Please free up some disk space before performing the build."
     exit 1
 fi
 
@@ -410,7 +410,7 @@ EOF
                                  --writable-root \
                                  --pure \
                                  --no-cwd \
-                                 --share="$PWD"=/riecoin \
+                                 --share="$PWD"=/gapcoin \
                                  --share="$DISTSRC_BASE"=/distsrc-base \
                                  --share="$OUTDIR_BASE"=/outdir-base \
                                  --expose="$(git rev-parse --git-common-dir)" \
@@ -435,7 +435,7 @@ EOF
                                         DISTSRC="$(distsrc_for_host "$HOST" "" /distsrc-base)" \
                                         OUTDIR="$(outdir_for_host "$HOST" "" /outdir-base)" \
                                         DIST_ARCHIVE_BASE=/outdir-base/dist-archive \
-                                      bash -c "cd /riecoin && bash contrib/guix/libexec/build.sh"
+                                      bash -c "cd /gapcoin && bash contrib/guix/libexec/build.sh"
     )
 
 done

@@ -85,11 +85,11 @@ int main(int argc, char* argv[])
                 return EXIT_FAILURE;
             }
         } else if (cmd.command == "gui") {
-            args.emplace_back(UseMultiprocess(cmd) ? "riecoin-gui" : "riecoin-qt");
+            args.emplace_back(UseMultiprocess(cmd) ? "gapcoin-gui" : "gapcoin-qt");
         } else if (cmd.command == "node") {
-            args.emplace_back(UseMultiprocess(cmd) ? "riecoin-node" : "riecoind");
+            args.emplace_back(UseMultiprocess(cmd) ? "gapcoin-node" : "gapcoind");
         } else if (cmd.command == "rpc") {
-            args.emplace_back("riecoin-cli");
+            args.emplace_back("gapcoin-cli");
             // Since "bitcoin rpc" is a new interface that doesn't need to be
             // backward compatible, enable -named by default so it is convenient
             // for callers to use a mix of named and unnamed parameters. Callers
@@ -97,17 +97,17 @@ int main(int argc, char* argv[])
             // that contain '=' characters, so -nonamed should rarely be needed.
             args.emplace_back("-named");
         } else if (cmd.command == "wallet") {
-            args.emplace_back("riecoin-wallet");
+            args.emplace_back("gapcoin-wallet");
         } else if (cmd.command == "tx") {
-            args.emplace_back("riecoin-tx");
+            args.emplace_back("gapcoin-tx");
         } else if (cmd.command == "bench") {
-            args.emplace_back("bench_riecoin");
+            args.emplace_back("bench_gapcoin");
         } else if (cmd.command == "chainstate") {
-            args.emplace_back("riecoin-chainstate");
+            args.emplace_back("gapcoin-chainstate");
         } else if (cmd.command == "test") {
-            args.emplace_back("test_riecoin");
+            args.emplace_back("test_gapcoin");
         } else if (cmd.command == "test-gui") {
-            args.emplace_back("test_riecoin-qt");
+            args.emplace_back("test_gapcoin-qt");
         } else {
             throw std::runtime_error(strprintf("Unrecognized command: '%s'", cmd.command));
         }

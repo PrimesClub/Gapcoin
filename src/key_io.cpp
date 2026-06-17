@@ -70,16 +70,16 @@ public:
 
     std::string operator()(const PKHash& id) const
     {
-        std::vector<unsigned char> data;
+        std::vector<unsigned char> data = {38};
         data.insert(data.end(), id.begin(), id.end());
-        return std::string("76a914") + HexStr(data) + std::string("88ac");
+        return EncodeBase58Check(data);
     }
 
     std::string operator()(const ScriptHash& id) const
     {
-        std::vector<unsigned char> data;
+        std::vector<unsigned char> data = {5};
         data.insert(data.end(), id.begin(), id.end());
-        return std::string("a914") + HexStr(data) + std::string("87");
+        return EncodeBase58Check(data);
     }
 };
 
@@ -91,25 +91,32 @@ CTxDestination DecodeDestination(const std::string& str, const CChainParams& par
     // Note this will be false if it is a valid Bech32 address for a different network
     bool is_bech32 = (ToLower(str.substr(0, params.Bech32HRP().size())) == params.Bech32HRP());
 
-    if (!is_bech32) {
-        std::vector<unsigned char> data;
-        if (str.size() == 50) {
-            if (str.substr(0, 6) == "76a914" && str.substr(46, 4) == "88ac") {
-                data = ParseHex(str.substr(6, 40));
-                if (data.size() == 20) {
-                    std::copy(data.begin(), data.end(), hash.begin());
-                    return PKHash(hash);
-                }
-            }
+    if (!is_bech32 && DecodeBase58Check(str, data, 21)) {
+        // base58-encoded Gapcoin addresses.
+        // Public-key-hash-addresses have version 38.
+        // The data vector contains RIPEMD160(SHA256(pubkey)), where pubkey is the serialized public key.
+        const std::vector<unsigned char>& pubkey_prefix = {38};
+        if (data.size() == hash.size() + pubkey_prefix.size() && std::equal(pubkey_prefix.begin(), pubkey_prefix.end(), data.begin())) {
+            std::copy(data.begin() + pubkey_prefix.size(), data.end(), hash.begin());
+            return PKHash(hash);
         }
-        else if (str.size() == 46) {
-            if (str.substr(0, 4) == "a914" && str.substr(44, 2) == "87") {
-                data = ParseHex(str.substr(4, 40));
-                if (data.size() == 20) {
-                    std::copy(data.begin(), data.end(), hash.begin());
-                    return ScriptHash(hash);
-                }
-            }
+        // Script-hash-addresses have version 5.
+        // The data vector contains RIPEMD160(SHA256(cscript)), where cscript is the serialized redemption script.
+        const std::vector<unsigned char>& script_prefix = {5};
+        if (data.size() == hash.size() + script_prefix.size() && std::equal(script_prefix.begin(), script_prefix.end(), data.begin())) {
+            std::copy(data.begin() + script_prefix.size(), data.end(), hash.begin());
+            return ScriptHash(hash);
+        }
+
+        // If the prefix of data matches either the script or pubkey prefix, the length must have been wrong
+        if ((data.size() >= script_prefix.size() &&
+                std::equal(script_prefix.begin(), script_prefix.end(), data.begin())) ||
+            (data.size() >= pubkey_prefix.size() &&
+                std::equal(pubkey_prefix.begin(), pubkey_prefix.end(), data.begin()))) {
+            error_str = "Invalid length for Base58 address (P2PKH or P2SH)";
+        } else {
+            error_str = "Invalid or unsupported Base58-encoded address.";
+             return CNoDestination();
         }
         error_str = "Invalid or unsupported Segwit (Bech32) encoding or Script.";
         return CNoDestination();

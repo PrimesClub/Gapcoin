@@ -49,9 +49,9 @@ static const int TOOLTIP_WRAP_THRESHOLD = 80;
 
 #define QAPP_ORG_NAME "Riecoin"
 #define QAPP_ORG_DOMAIN "riecoin.xyz"
-#define QAPP_APP_NAME_DEFAULT "Riecoin-Qt"
-#define QAPP_APP_NAME_TESTNET "Riecoin-Qt-testnet"
-#define QAPP_APP_NAME_REGTEST "Riecoin-Qt-regtest"
+#define QAPP_APP_NAME_DEFAULT "Gapcoin-Qt"
+#define QAPP_APP_NAME_TESTNET "Gapcoin-Qt-testnet"
+#define QAPP_APP_NAME_REGTEST "Gapcoin-Qt-regtest"
 
 /* One gigabyte (GB) in bytes */
 static constexpr uint64_t GB_BYTES{1000000000};

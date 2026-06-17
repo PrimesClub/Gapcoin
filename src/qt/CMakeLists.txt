@@ -254,41 +254,41 @@ endif()
 
 add_subdirectory(locale)
 
-add_executable(riecoin-qt
+add_executable(gapcoin-qt
   main.cpp
   ../init/riecoin-qt.cpp
 )
 
-add_windows_resources(riecoin-qt res/riecoin-qt-res.rc)
-add_windows_application_manifest(riecoin-qt)
+add_windows_resources(gapcoin-qt res/riecoin-qt-res.rc)
+add_windows_application_manifest(gapcoin-qt)
 
-target_link_libraries(riecoin-qt
+target_link_libraries(gapcoin-qt
   core_interface
   riecoinqt
   riecoin_node
 )
 
-import_plugins(riecoin-qt)
-install_binary_component(riecoin-qt HAS_MANPAGE)
+import_plugins(gapcoin-qt)
+install_binary_component(gapcoin-qt HAS_MANPAGE)
 if(WIN32)
-  set_target_properties(riecoin-qt PROPERTIES WIN32_EXECUTABLE TRUE)
+  set_target_properties(gapcoin-qt PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
 if(ENABLE_IPC)
-  add_executable(riecoin-gui
+  add_executable(gapcoin-gui
     main.cpp
     ../init/riecoin-gui.cpp
   )
-  target_link_libraries(riecoin-gui
+  target_link_libraries(gapcoin-gui
     core_interface
     riecoinqt
     riecoin_node
     riecoin_ipc
   )
-  import_plugins(riecoin-gui)
-  install_binary_component(riecoin-gui INTERNAL)
+  import_plugins(gapcoin-gui)
+  install_binary_component(gapcoin-gui INTERNAL)
   if(WIN32)
-    set_target_properties(riecoin-gui PROPERTIES WIN32_EXECUTABLE TRUE)
+    set_target_properties(gapcoin-gui PROPERTIES WIN32_EXECUTABLE TRUE)
   endif()
 endif()
 

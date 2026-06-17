@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-present The Bitcoin Core developers
+// Copyright (c) 2014-2021 The Gapcoin developers
 // Copyright (c) 2013-present The Riecoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -32,16 +33,18 @@ public:
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
-    int64_t nTime;
-    uint32_t nBits;
-    arith_uint256 nNonce;
+    uint32_t nTime;
+    uint64_t nBits;
+    uint32_t nNonce;
+    uint16_t nShift;
+    std::vector<uint8_t> nAdd;
 
     CBlockHeader()
     {
         SetNull();
     }
 
-    SERIALIZE_METHODS(CBlockHeader, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce); }
+    SERIALIZE_METHODS(CBlockHeader, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce, obj.nShift, obj.nAdd); }
 
     void SetNull()
     {
@@ -51,6 +54,8 @@ public:
         nTime = 0;
         nBits = 0;
         nNonce = 0;
+        nShift = 0;
+        nAdd = {0};
     }
 
     bool IsNull() const
@@ -59,7 +64,6 @@ public:
     }
 
     uint256 GetHash() const;
-    uint256 GetHashForPoW() const;
 
     NodeSeconds Time() const
     {
@@ -70,8 +74,6 @@ public:
     {
         return nTime;
     }
-
-    int32_t GetPoWVersion() const;
 };
 
 

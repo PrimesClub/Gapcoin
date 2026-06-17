@@ -1428,10 +1428,10 @@ void PeerManagerImpl::FindNextBlocks(std::vector<const CBlockIndex*>& vBlocks, c
                 return;
             }
 
-            if (!CanServeWitnesses(peer)) {
+            /*if (!CanServeWitnesses(peer)) { // Uncomment once enough people upgraded to 2606+...
                 // We wouldn't download this block or its descendants from this peer.
                 return;
-            }
+            }*/
 
             if (pindex->nStatus & BLOCK_HAVE_DATA || (activeChain && activeChain->Contains(*pindex))) {
                 if (activeChain && pindex->HaveNumChainTxs()) {
@@ -3338,7 +3338,8 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         }
 
         // Change version
-        pfrom.SetCommonVersion(std::min(nVersion, PROTOCOL_VERSION));
+        const int greatest_common_version(std::min(nVersion, PROTOCOL_VERSION));
+        pfrom.SetCommonVersion(greatest_common_version);
         pfrom.nVersion = nVersion;
 
         pfrom.m_has_all_wanted_services = HasAllDesirableServiceFlags(nServices);
@@ -3383,12 +3384,14 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
             return;
         }
 
-        MakeAndPushMessage(pfrom, NetMsgType::WTXIDRELAY);
+        if (greatest_common_version >= 70016)
+            MakeAndPushMessage(pfrom, NetMsgType::WTXIDRELAY);
 
         // Signal ADDRv2 support (BIP155).
-        MakeAndPushMessage(pfrom, NetMsgType::SENDADDRV2);
+        if (greatest_common_version >= 70016)
+            MakeAndPushMessage(pfrom, NetMsgType::SENDADDRV2);
 
-        if (m_txreconciliation) {
+        if (greatest_common_version >= 70016 && m_txreconciliation) {
             // Per BIP-330, we announce txreconciliation support if:
             // - protocol version per the peer's VERSION message supports WTXID_RELAY;
             // - transaction relay is supported per the peer's VERSION message

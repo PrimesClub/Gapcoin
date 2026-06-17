@@ -187,7 +187,7 @@ bool OptionsModel::Init(bilingual_str& error)
 
     // Display
     if (!settings.contains("strThirdPartyTxUrls"))
-        settings.setValue("strThirdPartyTxUrls", "https://riecoin.xyz/Explorer/Transaction/%s");
+        settings.setValue("strThirdPartyTxUrls", "");
     strThirdPartyTxUrls = settings.value("strThirdPartyTxUrls", "").toString();
 
     if (!settings.contains("fCoinControlFeatures"))
